@@ -35,10 +35,10 @@ The ADC of the ESP32 reads voltages between 0 and 3.3V. analogRead() has a resol
     -	Brake pressure: The 0-100mV signal has digital values from 0 to 124 so BRAKE_PRESSURE_OUT = map(BRAKE_PRESSURE_IN, 0, 124, 0, 255)
 -	APPS: The PST360 outputs a voltage from 0-5V so a voltage divider is used to shift the signal from 5V to 3.3V. The sensor measures angle values from 0-40 degrees.   
 <img src="https://i.imgur.com/D0QQ7qf.png" width=500 height=200>
-    - Angle = map(APPS, 0, 4095, 0, 40)
+    - Angle = map(APPS, 0, 4095, 0, 40)  
 
 
-**Executing the Code on ESP32**
+**Executing the Code on ESP32**  
 
 1.	In Arduino IDE, go to file -> preferences and add https://dl.espressif.com/dl/package_esp32_index.json to Additional Board Manager URLs
 2.	Go to tools -> board -> board manager and search for ESP32. Install esp32 by Espressif Systems. 
