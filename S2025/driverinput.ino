@@ -1,13 +1,8 @@
 #include <Arduino.h>
-#include <SPI.h>
 
 //Core definitions
 static const BaseType_t pro_cpu = 0;
 static const BaseType_t app_cpu = 1;
-
-//Chip select pins
-const uint8_t CS_1 = 10;
-const uint8_t CS_2 = 11;
 
 //Pin definitions
 int APPS_1 = 34;            //Analog input: sensor 1, pin 34 is input only
@@ -19,71 +14,26 @@ int BRAKE_PRESSURE_OUT = 33;    //Analog output: brake pressure (0-5V)
 int BUTTON = 19;            //Digital input: button pressed(1) or not pressed(0)
 int RTDS = 21;              //Digital output: ready to drive(1) or not ready(0)
 
+//Variables
+int sensor1value;
+int sensor2value;
+float sensor1angle;
+float sensor2angle;
+
 //Write functions for task
 void apps_check(void* pvParameters) {
   
-  //Configure SPI
- 
   unsigned long start;
   int implausible = 0;
   while (1) {
     
-    //FOR SENSOR 1
-    uint8_t data[10] = {0};
-    int index = 0;
-
-    SPI.beginTransaction(SPISettings(125000, MSBFIRST, SPI_MODE1));
-    digitalWrite(CS_1, LOW);
-    delayMicroseconds(20);
+    sensor1value = analogRead(APPS_1);
+    sensor2value = analogRead(APPS_2);
     
-    //Send start byte
-    data[index++] = SPI.transfer(0xAA);
-    delayMicroseconds(50);
- 
-    //Send and receive data bytes
-    for (uint8_t i = 1; i < 10; i++) {
-      data[index++] = SPI.transfer(0xFF);
-      delayMicroseconds(40);
-    }
-
-    digitalWrite(CS_1, HIGH);
-    SPI.endTransaction();
- 
-    //Extract and calculate angle
-    uint16_t data_bytes = (data[2] << 8) | data[3];  // Combine two bytes
-    uint16_t first14 = data_bytes >> 2; // Extract first 14 bits
-    float value = (float)(first14 / 16384.0);  // Divide by 2^14 and multiply by 360 to get degrees
-    float angle1 = (value - 0.1) / (0.9 - 0.1) * 360;
-
-    //FOR SENSOR 2
+    sensor1angle = map(sensor1value, 0, 4095, 0, 40);
+    sensor2angle = map(sensor2value, 0, 4095, 0, 40);
     
-    data[10] = {0};
-    index = 0;
-
-    SPI.beginTransaction(SPISettings(125000, MSBFIRST, SPI_MODE1));
-    digitalWrite(CS_2, LOW);
-    delayMicroseconds(20);
-    
-    //Send start byte
-    data[index++] = SPI.transfer(0xAA);
-    delayMicroseconds(50);
- 
-    //Send and receive data bytes
-    for (uint8_t j = 1; j < 10; j++) {
-      data[index++] = SPI.transfer(0xFF);
-      delayMicroseconds(40);
-    }
-
-    digitalWrite(CS_2, HIGH);
-    SPI.endTransaction();
- 
-    //Extract and calculate angle
-    data_bytes = (data[2] << 8) | data[3];  // Combine two bytes
-    first14 = data_bytes >> 2; // Extract first 14 bits
-    value = (float)(first14 / 16384.0);  // Divide by 2^14 and multiply by 360 to get degrees
-    float angle2 = (value - 0.1) / (0.9 - 0.1) * 360;
-    
-    float ratio = angle1 / angle2;
+    float ratio = sensor1angle / sensor2angle;
     if (ratio > 1.1 || ratio < 0.9) {
       start = micros();
       implausible = 1;
@@ -120,23 +70,19 @@ void RTDS_check(void* pvParameters) {
 void setup() {
 
   //Configure serial
-  Serial.begin(115200);
+  Serial.begin(9600);
 
   //Configure pins
+  pinMode(APPS_1, INPUT);
+  pinMode(APPS_2, INPUT);
   pinMode(THROTTLE, OUTPUT);
   pinMode(TRACTIVE_SYSTEM, INPUT);
   pinMode(BRAKE_PRESSURE_IN, INPUT);
   pinMode(BRAKE_PRESSURE_OUT, OUTPUT);
   pinMode(BUTTON, INPUT);
   pinMode(RTDS, OUTPUT);
-  pinMode(CS_1, OUTPUT);
-  pinMode(CS_2, OUTPUT);
 
-  //Deselect sensors initially
-  digitalWrite(CS_1, HIGH);
-  digitalWrite(CS_2, HIGH);
-  SPI.begin();
-
+  analogReadResolution(12);
 
   // Start APPS Check
   xTaskCreatePinnedToCore(
