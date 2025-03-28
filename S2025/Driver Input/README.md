@@ -22,7 +22,7 @@ Outputs
 
 Functions
 -	Apps_check
-    - Checks for implausibility between APPS sensors. If the difference between APPS_1 and APPS_2 is more than 10% and lasts for more than 100 ms, the throttle output is 0. Otherwise, the throttle output is the ratio between APPS_1 and APPS_2
+    - Checks for implausibility between APPS sensors. Checks for implausibility between APPS sensors. If the difference between percent output of APPS_1 and percent output APPS_2 is more than 10% and lasts for more than 100 ms, the throttle output is 0. Otherwise, the throttle output is the ratio between APPS_1 and APPS_2.  
 -	RTDS_check 
     - Indicates if the vehicle is Ready to Drive. The conditions for Ready to Drive are if the tractive system is active, brake pressure > 0, and the button is pressed. 
     - Linearly converts 0-100mV brake pressure input into 0-5V brake pressure output
@@ -33,10 +33,11 @@ Functions
 The ADC of the ESP32 reads voltages between 0 and 3.3V. analogRead() has a resolution of 12 bits, so the range of values is from 0-4095. 
 -	Brake pressure: The brake pressure input has a range of 0-100mV. The DAC of the ESP32 outputs voltages between 0 and 3.3V. dacWrite() has a resolution of 8 bits, so the range of values is from 0-255. 
     -	Brake pressure: The 0-100mV signal has digital values from 0 to 124 so BRAKE_PRESSURE_OUT = map(BRAKE_PRESSURE_IN, 0, 124, 0, 255)
--	APPS: The PST360 outputs a voltage from 0-5V so a voltage divider is used to shift the signal from 5V to 3.3V. The sensor measures angle values from 0-40 degrees.   
-<img src="https://i.imgur.com/D0QQ7qf.png" width=500 height=200>
-    - Angle = map(APPS, 0, 4095, 0, 40)  
-
+-	APPS: The rules specify that the output functions of the sensors must have different slopes. The PST 360 outputs a voltage from 0-5V so a voltage divider is used. The  sensor outputs values from 10% to 90% of the output level, represented by the percent variable. The percent of the output level will be used to detect implausibility. 
+    - Sensor 1: 5V -> 3V, R1 = 3K, R2 = 4.7k 
+        - Percent = sensor1value/3722 
+    - Sensor 2: 5V -> 3.3V, R1 = 1.5K, R2 = 3K 
+        - Percent = sensor2value/4095 
 
 **Executing the Code on ESP32**  
 
