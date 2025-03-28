@@ -5,8 +5,8 @@ static const BaseType_t pro_cpu = 0;
 static const BaseType_t app_cpu = 1;
 
 //Pin definitions
-int APPS_1 = 34;            //Analog input: sensor 1, pin 34 is input only
-int APPS_2 = 35;            //Analog input: sensor 2, pin 35 is input only
+int APPS_1 = 38;            //Analog input: sensor 1, pin 34 is input only
+int APPS_2 = 39;            //Analog input: sensor 2, pin 35 is input only
 int THROTTLE = 32;          //Analog output: ratio between sensors or 0 if implausible
 int TRACTIVE_SYSTEM = 18;   //Digital input: tractive system active(0) or inactive(1)
 int BRAKE_PRESSURE_IN = 36;       //Analog input: brake pressure (0-100mV), pin 36 is input only
@@ -15,29 +15,43 @@ int BUTTON = 19;            //Digital input: button pressed(1) or not pressed(0)
 int RTDS = 21;              //Digital output: ready to drive(1) or not ready(0)
 
 //Variables
-int sensor1value;
-int sensor2value;
+float sensor1value;
+float sensor2value;
 float sensor1angle;
 float sensor2angle;
+float ratio = 0;
+float percent1; 
+float percent2;
 
 //Write functions for task
-void apps_check(void* pvParameters) {
+void apps_check(void *parameters) {
   
   unsigned long start;
   int implausible = 0;
   while (1) {
     
-    sensor1value = analogRead(APPS_1);
-    sensor2value = analogRead(APPS_2);
+    sensor1value = analogRead(APPS_1); // Range: 0.305V - 2.747V
+    sensor2value = analogRead(APPS_2); // Range: 0.333V - 3V 
     
-    sensor1angle = map(sensor1value, 0, 4095, 0, 40);
-    sensor2angle = map(sensor2value, 0, 4095, 0, 40);
-    
-    float ratio = sensor1angle / sensor2angle;
+    percent1 = (sensor1value/3722)*100; //should give values between 10% and 90%
+    percent2 = (sensor2value/4095)*100; 
+  
+    ratio = percent1/percent2;
+    Serial.print("sensor 1:");
+    Serial.println(sensor1value);
+    Serial.print("sensor 2:");
+    Serial.println(sensor2value);
+    Serial.print("Ratio:");
+    Serial.println(ratio);
     if (ratio > 1.1 || ratio < 0.9) {
       start = micros();
       implausible = 1;
       while (micros() - start <= 100) {
+        sensor1value = analogRead(APPS_1); // Range: 0.305V - 2.747V
+        sensor2value = analogRead(APPS_2); // Range: 0.333V - 3V 
+        percent1 = (sensor1value/3723)*100;
+        percent2 = (sensor2value/4096)*100;  
+        ratio = percent1/percent2;
         if ((ratio > 1.1 || ratio < 0.9) == false) {
           implausible = 0;
           break;
@@ -45,16 +59,20 @@ void apps_check(void* pvParameters) {
       }
     }
     if (implausible == 1) {
-      digitalWrite(THROTTLE, 0);
+      digitalWrite(23, HIGH);
+      //digitalWrite(THROTTLE, 0);
     }
     else {
+      digitalWrite(23, LOW);
       dacWrite(THROTTLE, ratio*255);
     }
+
+    vTaskDelay(pdMS_TO_TICKS(10));
   }
 }
 
-void RTDS_check(void* pvParameters) {
-  while (1) {
+void RTDS_check(void *parameters) {
+  /**while (1) {
     float pressure_in = analogRead(BRAKE_PRESSURE_IN);
     float pressure_out = map(BRAKE_PRESSURE_IN, 0, 124, 0, 255);
     dacWrite(BRAKE_PRESSURE_OUT, pressure_out);
@@ -64,13 +82,15 @@ void RTDS_check(void* pvParameters) {
     else {
       digitalWrite(RTDS, LOW);
     }
-  }
+    vTaskDelay(pdMS_TO_TICKS(10));
+  }*/
 }
 
 void setup() {
 
   //Configure serial
-  Serial.begin(9600);
+  Serial.begin(115200);
+  pinMode(23, OUTPUT);
 
   //Configure pins
   pinMode(APPS_1, INPUT);
@@ -81,10 +101,9 @@ void setup() {
   pinMode(BRAKE_PRESSURE_OUT, OUTPUT);
   pinMode(BUTTON, INPUT);
   pinMode(RTDS, OUTPUT);
-
   analogReadResolution(12);
-
-  // Start APPS Check
+  
+   // Start APPS Check
   xTaskCreatePinnedToCore(
     apps_check,              //Function to be called
     "APPS Check",           //Name of task
@@ -94,7 +113,7 @@ void setup() {
     NULL,                   //Task handle
     pro_cpu);               //Define CPU core to run the task
 
-  // Start RTDS Check
+  //Start RTDS Check
   xTaskCreatePinnedToCore(
     RTDS_check,
     "RTDS Check",
